@@ -25,6 +25,7 @@ flowchart LR
 - ✅ 腾讯云上的 Gateway、微信官方插件、Pi、ACPX 与 DeepSeek 已安装并可用。
 - ✅ 微信已扫码登录；插件收到了私聊消息并成功走过 OpenClaw 的模型回复链路。
 - ✅ Pi 在服务器工作目录中可直接调用 DeepSeek。
+- ✅ 本机 Pi 的非敏感配置、用户包、Skill、扩展和历史 JSONL 会话已同步到腾讯云；旧轻量桥的 4 个 Pi 会话也单独保留。
 - ✅ 为微信插件 `2.4.6` 部署了 ACP 会话适配层，使指定私聊可映射到 Pi 的持久 ACPX 会话。
 - ⏳ 最后一步：需在适配层生效后从微信发送一条新消息，确认日志出现 ACPX/Pi 会话并收到回复。未完成这一步前，不把“微信每条消息由 Pi 执行”写成已验收。
 
@@ -88,9 +89,28 @@ flowchart LR
 | `bridge.py` `TaskStore` | OpenClaw session store + ACPX 持久会话 | 不再单独维护 `tasks.json`；必须观察 session 生命周期 |
 | `PiRpc` 子进程 | ACPX 启动与管理 Pi | Pi 仍在远端工作目录运行，模型仍由 DeepSeek API 推理 |
 | `run.sh` + LaunchAgent | 用户级 `openclaw-gateway.service` | macOS 睡眠恢复逻辑变为服务器 systemd 生命周期 |
-| `tool-output-cap.js` | Pi/OpenClaw 工具策略与会话上下文控制 | 当前迁移不自动复制旧扩展；需要长输出场景时再单独启用 |
+| `tool-output-cap.js` | Pi/OpenClaw 工具策略与会话上下文控制 | 旧桥的扩展代码保留在本机方案文档中；服务器按本机 Pi 的用户包和扩展清单加载 |
 
-原桥保留在文档中用于学习和回退设计；服务器上没有复制本机微信凭据、`tasks.json` 或历史 `pi-session`。
+原桥保留在文档中用于学习和回退设计；服务器没有复制本机微信凭据或 `tasks.json`，但已把 Pi 历史会话以独立目录同步，避免与服务器既有会话重名。
+
+## 本机 Pi 状态迁移
+
+本次迁移不是只安装 Pi 和微信插件，而是把可复用的 Pi 运行资源同步到腾讯云：
+
+| 来源 | 腾讯云目标 | 结果 |
+|---|---|---|
+| `~/.pi/agent/settings.json`、`AGENTS.md`、模型清单与信任配置 | `/home/ubuntu/.pi/agent/` | 已同步 |
+| `~/.pi/agent/sessions/*.jsonl` | `/home/ubuntu/.pi/agent/sessions/` | 29 个本机会话，缺失数 0 |
+| 本机轻量桥 `~/.local/share/pi-wechat-bridge/pi-session/` | `/home/ubuntu/.pi/agent/sessions/--local-pi-wechat-bridge--/` | 4 个会话，单独隔离 |
+| `~/.pi/packages/*` 与 `~/.pi/agent/npm/package.json` | 腾讯云对应 Pi 包目录 | `pi list` 显示 7/7 个用户包 |
+| `~/.pi/qwen-agent/`（不含 `auth.json`） | `/home/ubuntu/.pi/qwen-agent/` | 备用 Pi profile、1 个会话和 `mattpocock/skills` 仓库已同步 |
+| `~/.pi/remote/`、`~/.pi/examples/`、`mcp-cache.json` | 腾讯云对应目录 | remote-pi Skill、示例和 MCP schema 缓存已同步 |
+
+迁移后的 Skill/扩展会在 Pi 启动时按配置注册，Skill 本身按需加载，不会把全部 Skill 文本强行注入每轮上下文。已在服务器验证 5 个 `SKILL.md` 的 frontmatter（`name`、`description`）有效，并用 `--skill` 实际加载 `eli5` 与 `skill-creator`；5 个用户扩展均通过 `pi --help` 加载检查。历史会话可用 `pi --export <session.jsonl> <output.html>` 导出，代表会话导出成功。
+
+出于凭据边界，本次不复制本机 `.env`、`mcp.json`、微信/Gateway token 或私钥。DeepSeek 服务器认证沿用既有远端配置；本机 Exa MCP 若需要，在服务器上单独注入凭据和安装对应命令，不把密钥写入仓库。
+
+备用 profile 可用 `PI_CODING_AGENT_DIR=/home/ubuntu/.pi/qwen-agent pi list` 查看；它的本地 Qwen 模型文件和认证不随迁移包复制。
 
 ## 运行边界
 
