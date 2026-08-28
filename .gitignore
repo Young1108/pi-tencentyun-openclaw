@@ -1,0 +1,13 @@
+# 运行时凭据、会话与日志仅保存在服务器，绝不进入仓库。
+.env
+*.env
+auth.json
+openclaw.json
+accounts.json
+*.token
+*.sqlite
+*.sqlite-*
+sessions/
+logs/
+state/
+node_modules/

@@ -1,0 +1,47 @@
+{
+  gateway: {
+    mode: "local",
+    bind: "loopback",
+  },
+  agents: {
+    list: [
+      {
+        id: "pi-wechat",
+        runtime: {
+          type: "acp",
+          acp: {
+            agent: "pi",
+            backend: "acpx",
+            mode: "persistent",
+            cwd: "/home/ubuntu/workspace/pi-openclaw",
+          },
+        },
+      },
+    ],
+  },
+  acp: {
+    enabled: true,
+    dispatch: { enabled: true },
+    backend: "acpx",
+    defaultAgent: "pi",
+    allowedAgents: ["pi"],
+    stream: { deliveryMode: "live" },
+  },
+  session: {
+    dmScope: "per-account-channel-peer",
+  },
+  plugins: {
+    entries: {
+      acpx: {
+        enabled: true,
+        config: {
+          timeoutSeconds: 180,
+          probeAgent: "pi",
+          permissionMode: "approve-all",
+          nonInteractivePermissions: "fail",
+        },
+      },
+      "openclaw-weixin": { enabled: true },
+    },
+  },
+}
