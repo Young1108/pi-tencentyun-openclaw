@@ -34,6 +34,64 @@ flowchart LR
 
 原本机方案是 Python `bridge.py`：微信 ClawBot Gateway → Pi RPC，并额外处理睡眠恢复、任务持久化、Pi 重启和工具输出截断。新方案把微信通道和会话路由交给 OpenClaw 官方插件，保留 Pi 作为 Agent 运行时。详细对比见 [架构说明](docs/architecture.md)。
 
+## 原本机方案：轻量微信桥
+
+原方案位于本机 `~/.local/share/pi-wechat-bridge/`，由 macOS LaunchAgent 常驻。它不是一个模型服务，而是一个把微信消息可靠转发给本机 Pi RPC 的小型编排层。
+
+```mermaid
+flowchart LR
+    U[微信私聊] --> CG[本机 ClawBot Gateway\n127.0.0.1:8765]
+    CG --> B[bridge.py\nPython asyncio]
+    B --> TS[tasks.json\n任务状态]
+    B --> RPC[Pi --mode rpc\nstdin/stdout JSONL]
+    RPC --> S[pi-session/\nPi 会话文件]
+    RPC --> DS[DeepSeek API]
+    B --> CG
+    RUN[run.sh + LaunchAgent] -. 监控/拉起 .-> CG
+    RUN -. 监控/拉起 .-> B
+    CAP[tool-output-cap.js\n12,000 字符上限] -. Pi 扩展 .-> RPC
+```
+
+### 组件职责
+
+| 组件 | 作用 | 关键行为 |
+|---|---|---|
+| `run.sh` | 进程包装与守护 | 启动 ClawBot Gateway；轮询 `127.0.0.1:8765`；Gateway 或桥退出时结束包装进程，由 LaunchAgent 重新拉起整条链路 |
+| `bridge.py` `LocalClawBotClient` | 微信 Gateway 客户端 | WebSocket 连接禁用系统代理；回复失败或 Mac 唤醒后强制重连 |
+| `bridge.py` `TaskStore` | 任务可靠性 | 用原子替换写 `tasks.json`；记录 `pending/processing/completed/failed`、尝试次数和错误；重启后恢复未完成任务 |
+| `bridge.py` `PiRpc` | Pi 进程管理 | 启动 `pi --mode rpc --session-dir ... --approve`；读写 JSONL；600 秒总超时、300 秒无事件卡死检测；异常退出或卡死自动重启 |
+| `Bridge` | 消息编排 | 只接收文字；先保存任务，再串行投递 Pi；故障自动重新排队，最多按配置重试；回复失败重连后再发 |
+| `tool-output-cap.js` | 上下文控制 | 将单轮工具结果限制为默认 12,000 字符，并提示 Pi 用更精确的查询继续获取信息 |
+| `pi-session/` | 会话持久化 | 保存 Pi 的 JSONL 会话，不随微信账号凭据进入 Git |
+
+### 原方案一次消息的生命周期
+
+1. `ClawBot Gateway` 收到私聊，`bridge.py` 校验发送者白名单。
+2. `TaskStore.enqueue()` 原子写入 `tasks.json`，任务进入 `pending`。
+3. worker 将任务标记为 `processing`，向微信发送“已交给本机 Pi 处理”。
+4. `PiRpc.prompt()` 把文本写入 Pi RPC stdin；Pi 的 JSONL stdout 持续返回事件。
+5. 收到 `agent_settled` 后保存结果，状态改为 `completed`，并把最多 12,000 字符的结果回复微信。
+6. 如果 Pi 卡死、退出或微信回复连接断开，任务回到 `pending`，桥重启/重连后继续处理；达到重试上限则保留任务和错误。
+
+### 原方案的边界
+
+- 只把非空文字传给 Pi；图片或空消息不会进入 Pi，会收到补充文字或文件路径的提示。
+- Pi 工作目录是本机 `~/Documents`，可以访问 Mac 文件；迁移到腾讯云后必须改为服务器工作目录，不能继续假设本地文件存在。
+- `--approve` 会自动批准 Pi 的确认请求；其他交互请求由桥取消并回告微信。
+- 任务状态、Pi 会话、Gateway 日志和 API 凭据都在本机运行目录，重装或清理前需要单独备份。
+
+### 与迁移后方案的对应关系
+
+| 原本机轻量桥 | 腾讯云迁移后的对应物 | 变化 |
+|---|---|---|
+| ClawBot Gateway + `LocalClawBotClient` | `openclaw-weixin` + OpenClaw Gateway | 微信登录、长轮询和出站发送交给官方插件 |
+| `bridge.py` `TaskStore` | OpenClaw session store + ACPX 持久会话 | 不再单独维护 `tasks.json`；必须观察 session 生命周期 |
+| `PiRpc` 子进程 | ACPX 启动与管理 Pi | Pi 仍在远端工作目录运行，模型仍由 DeepSeek API 推理 |
+| `run.sh` + LaunchAgent | 用户级 `openclaw-gateway.service` | macOS 睡眠恢复逻辑变为服务器 systemd 生命周期 |
+| `tool-output-cap.js` | Pi/OpenClaw 工具策略与会话上下文控制 | 当前迁移不自动复制旧扩展；需要长输出场景时再单独启用 |
+
+原桥保留在文档中用于学习和回退设计；服务器上没有复制本机微信凭据、`tasks.json` 或历史 `pi-session`。
+
 ## 运行边界
 
 - Pi 会在腾讯云执行命令和读写文件，不能直接操作 Mac 本地文件。
