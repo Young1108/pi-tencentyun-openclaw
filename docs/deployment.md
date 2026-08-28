@@ -19,7 +19,20 @@
 4. 安装并启动 Gateway 的 systemd 用户服务。
 5. 在腾讯云终端执行 `openclaw channels login --channel openclaw-weixin` 并扫码。
 6. 读取新微信 accountId，写入 `account + channel + peer` binding。
-7. 从微信发送测试消息，随后停止本机同账号通道，完成切换。
+7. 对 `openclaw-weixin@2.4.6` 应用 `scripts/patch-weixin-acp-binding.mjs`，补齐 ACP session binding 适配并重启 Gateway。
+8. 从微信发送测试消息，确认创建的是 Pi/ACPX session，随后停止本机同账号通道，完成切换。
+
+## 微信 ACP 适配
+
+该版本的微信插件可以登录并回复，但不会自动把配置的 ACP binding 物化为 ACP session。部署脚本只支持当前已验证的 `@tencent-weixin/openclaw-weixin@2.4.6`，并在改写前备份插件源码：
+
+```bash
+openclaw plugins inspect openclaw-weixin
+node /home/ubuntu/workspace/pi-openclaw/patch-weixin-acp-binding.mjs <上一步显示的Install-path>
+systemctl --user restart openclaw-gateway.service
+```
+
+升级插件后必须重新运行检查；版本或源码结构不匹配时脚本会失败，此时不要跳过验证强行覆盖。
 
 ## 不迁移的运行状态
 
