@@ -45,6 +45,8 @@ ssh tencent 'pi --export /home/ubuntu/.pi/agent/sessions/<session>.jsonl /tmp/pi
 
 Skill 验证使用 `pi --no-session --no-tools --skill <SKILL.md> -p <prompt>`；扩展验证使用 `pi --no-session --no-tools --extension <extension> --help`。Skill 是按需加载，未显式选择时不会把所有 Skill 内容注入提示词。
 
+修改 ACP 适配脚本后先运行 `node scripts/patch-weixin-acp-binding.test.mjs`。该测试覆盖新安装和已部署 v1 补丁升级两条路径，确认 matcher 返回对象或 `null` 后再触碰远端插件。
+
 依赖安装记录：本机锁文件与服务器 npm 解析结果存在缺项，首次 `npm ci --omit=dev` 报 lock mismatch；随后在远端执行 `npm install --omit=dev --no-audit --no-fund` 完成解析并写回锁文件。后续锁文件稳定后可恢复使用 `npm ci`。
 
 ## 微信 ACP 适配

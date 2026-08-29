@@ -1,6 +1,6 @@
 # 腾讯云 OpenClaw 迁移验收
 
-更新时间：2026-08-29 02:31 CST
+更新时间：2026-08-29 09:33 CST
 执行者：Codex
 
 ```mermaid
@@ -26,7 +26,7 @@ flowchart LR
 | N4 | Gateway 仅回环监听且探针成功 | `127.0.0.1:18789`、`Connectivity probe: ok` | ✅ 通过 | `openclaw gateway status` |
 | N5 | 微信账号登录 | 已扫码，微信插件显示 `running` | ✅ 通过 | `openclaw channels status --channel openclaw-weixin` |
 | N6 | 指定微信私聊路由至 pi-wechat | account、channel、peer 与 ACP 配置已写入 | ✅ 通过 | `openclaw config get bindings` |
-| N7 | 微信私聊可物化 ACPX/Pi session | 微信插件 2.4.6 已增加受版本保护的 binding/初始化适配 | ✅ 部署完成 | `scripts/patch-weixin-acp-binding.mjs`、Gateway 重启与探针 |
+| N7 | 微信私聊可物化 ACPX/Pi session | v1 matcher 返回布尔值的问题已修复为 SDK 要求的对象/null；远端 v2 补丁已应用并重启 | ✅ 修复完成，⏳ 待微信触发 | `scripts/patch-weixin-acp-binding.mjs`、`scripts/patch-weixin-acp-binding.test.mjs`、Gateway 重启与探针 |
 | N8 | Skill schema 可解析且可实际加载 | 5 个 `SKILL.md` frontmatter 有效；`eli5` 与 `skill-creator` 加载通过 | ✅ 通过 | 远端 `pi --skill ... -p ...` |
 | N9 | 历史会话可读取和导出 | 代表 JSONL 会话导出 HTML 成功，365289 bytes | ✅ 通过 | 远端 `pi --export` |
 | N10 | 微信收到 Pi 回复 | 等待补丁后的新测试消息 | ⏳ 待用户操作 | 微信消息、ACPX/Pi session 与 Gateway 日志 |

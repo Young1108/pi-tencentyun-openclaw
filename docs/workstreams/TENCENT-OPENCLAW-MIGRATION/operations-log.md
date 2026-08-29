@@ -1,6 +1,6 @@
 # 操作留痕
 
-更新时间：2026-08-29 02:31 CST
+更新时间：2026-08-29 09:33 CST
 执行者：Codex
 
 | 时间（CST） | 动作 | 工具/命令 | 结果摘要 |
@@ -21,3 +21,4 @@
 | 2026-08-29 02:31 | 验证 Skill/扩展 schema | 远端 `pi --skill`、`pi --extension ... --help` | 5 个 `SKILL.md` frontmatter 合法；2 个 Skill 实际加载通过；5 个扩展加载检查通过 |
 | 2026-08-29 02:31 | 验证历史会话 | 远端 `pi --export` | 代表性迁移 JSONL 成功导出为 365289 bytes HTML |
 | 2026-08-29 02:31 | 清理同步旁车文件 | 精确查找并删除远端 `.pi` 下 `._*` | AppleDouble 文件从 12 个清理为 0；未触碰其他文件 |
+| 2026-08-29 09:33 | 修复 ACP binding matcher | 本地契约测试、远端 v1→v2 补丁升级、`systemctl --user restart` | matcher 返回对象/null；Pi agent 回归返回 `ACP_HEALTH_OK`；Gateway 探针恢复正常 |

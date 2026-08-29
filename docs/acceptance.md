@@ -1,6 +1,6 @@
 # 验收记录
 
-更新时间：2026-08-29 02:31 CST
+更新时间：2026-08-29 09:33 CST
 执行者：Codex
 
 | 检查项 | 预期 | 状态 | 证据 |
@@ -17,8 +17,9 @@
 | 凭据边界 | 敏感文件不进入迁移包和仓库 | ⚠️ 按设计 | `.env`、`mcp.json`、微信/Gateway token 未复制；MCP 凭据需单独配置 |
 | 微信通道 | `openclaw-weixin` 已登录且 running | ✅ 通过 | 扫码完成，`openclaw channels status` 显示 `enabled, configured, running` |
 | 精确 binding 配置 | 指定微信私聊配置到 `pi-wechat` | ✅ 已写入 | `channel + accountId + peer + type: acp` 均已写入运行配置 |
+| ACP matcher 契约 | 命中返回对象，未命中返回 `null`；旧 v1 可升级 | ✅ 通过 | `node scripts/patch-weixin-acp-binding.test.mjs` |
 | 微信普通回复 | 私聊进入通道并得到回复 | ✅ 通过 | 入站后 DeepSeek 请求返回 HTTP 200，持久会话记录存在 assistant 回复 |
-| 微信 ACP 适配 | 该私聊能物化为 ACPX/Pi session | ✅ 已部署，⏳ 待触发 | `scripts/patch-weixin-acp-binding.mjs` 已通过语法检查、远端已应用并重启 Gateway |
+| 微信 ACP 适配 | 该私聊能物化为 ACPX/Pi session | ✅ v2 已修复并重启，⏳ 待触发 | matcher 契约测试通过；远端插件已从 v1 升级到 v2，Gateway 已重启 |
 | 端到端 Pi 回复 | 微信文字由 Pi ACPX 处理并返回 | ⏳ 待用户发送补丁后的测试消息 | 需要 ACP session/Pi 日志与微信收到回复的双重证据 |
 
 ## 已知启动恢复

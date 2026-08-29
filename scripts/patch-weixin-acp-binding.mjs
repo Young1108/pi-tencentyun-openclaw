@@ -35,20 +35,17 @@ if (packageMetadata.name !== "@tencent-weixin/openclaw-weixin" || packageMetadat
 
 const channelSource = readFileSync(channelFile, "utf8");
 const processMessageSource = readFileSync(processMessageFile, "utf8");
-const marker = "openclaw-weixin ACP persistent-binding patch v1";
+const marker = "openclaw-weixin ACP persistent-binding patch v2";
+const legacyMarker = "openclaw-weixin ACP persistent-binding patch v1";
 const bindingMarker = "compileConfiguredBinding: ({ conversationId }) => ({ conversationId })";
 
 const channelPatched = channelSource.includes(bindingMarker);
 const processMessagePatched = processMessageSource.includes(marker);
+const legacyProcessMessagePatched = processMessageSource.includes(legacyMarker);
 
 if (channelPatched && processMessagePatched) {
   console.log(`补丁已存在：${pluginRoot}`);
   process.exit(0);
-}
-
-if (channelPatched || processMessagePatched) {
-  console.error("检测到不完整的 ACP 补丁；请从 .pre-acp-binding-2.4.6.bak 备份恢复后重试。");
-  process.exit(1);
 }
 
 const importAnchor = 'import { logger } from "../util/logger.js";';
@@ -60,13 +57,6 @@ const routeAnchor = `    const route = deps.channelRuntime.routing.resolveAgentR
     });`;
 const configAnchor = `    config: {
         listAccountIds: (cfg) => listWeixinAccountIds(cfg),`;
-
-if (!channelSource.includes(configAnchor) ||
-    !processMessageSource.includes(importAnchor) ||
-    !processMessageSource.includes(routeAnchor)) {
-  console.error("微信插件源码与 2.4.6 预期结构不一致；已拒绝写入。请先适配新版本。");
-  process.exit(1);
-}
 
 const acpImport = `
 // ${marker}
@@ -102,15 +92,53 @@ const patchedRoute = `    const baseRoute = deps.channelRuntime.routing.resolveA
     }`;
 const bindingCapability = `    bindings: {
         compileConfiguredBinding: ({ conversationId }) => ({ conversationId }),
+        matchInboundConversation: ({ compiledBinding, conversationId, parentConversationId }) => {
+            const matchesParent = compiledBinding.conversationId === parentConversationId;
+            if (compiledBinding.conversationId !== conversationId && !matchesParent) return null;
+            return {
+                conversationId: matchesParent ? parentConversationId : conversationId,
+                matchPriority: matchesParent ? 1 : 2,
+            };
+        },
+    },
+`;
+
+const legacyBindingCapability = `    bindings: {
+        compileConfiguredBinding: ({ conversationId }) => ({ conversationId }),
         matchInboundConversation: ({ compiledBinding, conversationId, parentConversationId }) =>
             compiledBinding.conversationId === conversationId ||
             compiledBinding.conversationId === parentConversationId,
     },
 `;
 
-let patchedChannel = channelSource.replace(configAnchor, `${bindingCapability}${configAnchor}`);
-let patchedProcessMessage = processMessageSource.replace(importAnchor, `${importAnchor}${acpImport}`);
-patchedProcessMessage = patchedProcessMessage.replace(routeAnchor, patchedRoute);
+let patchedChannel;
+let patchedProcessMessage;
+
+if (channelPatched && legacyProcessMessagePatched) {
+  patchedChannel = channelSource.replace(legacyBindingCapability, bindingCapability);
+  patchedProcessMessage = processMessageSource.replace(`// ${legacyMarker}`, `// ${marker}`);
+  if (patchedChannel === channelSource || patchedProcessMessage === processMessageSource) {
+    console.error("检测到旧版 ACP 补丁但无法升级；请从 .pre-acp-binding-2.4.6.bak 备份恢复后重试。");
+    process.exit(1);
+  }
+  console.log("正在升级 v1 ACP 补丁到 v2 binding matcher");
+} else {
+  if (channelPatched || processMessagePatched || legacyProcessMessagePatched) {
+    console.error("检测到不完整的 ACP 补丁；请从 .pre-acp-binding-2.4.6.bak 备份恢复后重试。");
+    process.exit(1);
+  }
+
+  if (!channelSource.includes(configAnchor) ||
+      !processMessageSource.includes(importAnchor) ||
+      !processMessageSource.includes(routeAnchor)) {
+    console.error("微信插件源码与 2.4.6 预期结构不一致；已拒绝写入。请先适配新版本。");
+    process.exit(1);
+  }
+
+  patchedChannel = channelSource.replace(configAnchor, `${bindingCapability}${configAnchor}`);
+  patchedProcessMessage = processMessageSource.replace(importAnchor, `${importAnchor}${acpImport}`);
+  patchedProcessMessage = patchedProcessMessage.replace(routeAnchor, patchedRoute);
+}
 
 if (patchedChannel === channelSource || patchedProcessMessage === processMessageSource) {
   console.error("没有生成补丁内容；已拒绝写入。");

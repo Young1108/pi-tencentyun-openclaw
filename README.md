@@ -1,6 +1,6 @@
 # 腾讯云 Pi + OpenClaw 微信部署学习项目
 
-最后更新：2026-08-29 02:19 CST
+最后更新：2026-08-29 09:33 CST
 执行者：Codex
 
 这个仓库记录将本机轻量微信桥迁移为腾讯云上 **Pi + OpenClaw + 官方微信插件** 的过程。目标是：在微信私聊中直接向 Pi 提问，并让 Pi 在腾讯云工作目录中执行任务。
@@ -30,6 +30,8 @@ flowchart LR
 - ⏳ 最后一步：需在适配层生效后从微信发送一条新消息，确认日志出现 ACPX/Pi 会话并收到回复。未完成这一步前，不把“微信每条消息由 Pi 执行”写成已验收。
 
 > 发现与取舍：未适配的微信插件只做普通 Agent 路由，配置中的 `type: "acp"` binding 不会被编译成 ACP 会话，因而消息会落到 OpenClaw 内置 Agent。`scripts/patch-weixin-acp-binding.mjs` 只补齐官方插件缺少的会话匹配与 ACP 初始化，不替换其微信登录、长轮询或消息发送实现。
+
+> 兼容性修复：v1 补丁曾让 `matchInboundConversation` 返回布尔值，导致 SDK 在首次私聊入站时读取 `conversationId` 失败；当前脚本为 v2，严格返回 SDK 要求的匹配对象或 `null`，并可自动升级已部署的 v1 补丁。
 
 ## 为什么从轻量桥切换
 
@@ -128,6 +130,7 @@ flowchart LR
 - [Pi 脱敏配置模板](configs/pi-settings.server.json)
 - [服务器自检脚本](scripts/verify.sh)
 - [微信 ACP 适配补丁](scripts/patch-weixin-acp-binding.mjs)
+- [微信 ACP 适配契约测试](scripts/patch-weixin-acp-binding.test.mjs)
 
 ## 最小验收
 
